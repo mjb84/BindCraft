@@ -162,6 +162,10 @@ pip3 install git+https://github.com/sokrypton/ColabDesign.git --no-deps || { ech
 # Verify ColabDesign installation
 python3 -c "import colabdesign" &>/dev/null || { echo "Error: colabdesign module not found after installation."; exit 1; }
 
+# Cleanup pip cache to save space
+echo "Cleaning up pip cache..."
+pip3 cache purge || { echo "Warning: Failed to purge pip cache."; }
+
 # Download AlphaFold2 model weights
 echo "Downloading AlphaFold2 model weights..."
 params_dir="${install_dir}/params"
