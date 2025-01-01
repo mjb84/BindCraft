@@ -93,7 +93,7 @@ python -c "import colabdesign" >/dev/null 2>&1 || { echo -e "Error: colabdesign 
 
 # AlphaFold2 weights
 echo -e "Downloading AlphaFold2 model weights \n"
-params_dir="/tmp" # Download to /tmp
+params_dir="${install_dir}/params" # Changed to ensure correct path
 params_file="${params_dir}/alphafold_params_2022-12-06.tar"
 
 # download AF2 weights
@@ -101,9 +101,9 @@ mkdir -p "${params_dir}" || { echo -e "Error: Failed to create weights directory
 wget -O "${params_file}" "https://storage.googleapis.com/alphafold/alphafold_params_2022-12-06.tar" || { echo -e "Error: Failed to download AlphaFold2 weights"; exit 1; }
 [ -s "${params_file}" ] || { echo -e "Error: Could not locate downloaded AlphaFold2 weights"; exit 1; }
 
-# extract AF2 weights to the install directory
+# extract AF2 weights to params_dir
 tar tf "${params_file}" >/dev/null 2>&1 || { echo -e "Error: Corrupt AlphaFold2 weights download"; exit 1; }
-tar -xvf "${params_file}" -C "${install_dir}/params" || { echo -e "Error: Failed to extract AlphaFold2 weights"; exit 1; }
+tar -xvf "${params_file}" -C "${params_dir}" || { echo -e "Error: Failed to extract AlphaFold2 weights"; exit 1; }
 [ -f "${install_dir}/params/params_model_5_ptm.npz" ] || { echo -e "Error: Could not locate extracted AlphaFold2 weights"; exit 1; }
 rm "${params_file}" || { echo -e "Warning: Failed to remove AlphaFold2 weights archive"; }
 
