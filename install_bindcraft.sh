@@ -110,6 +110,7 @@ rm "${params_file}" || { echo -e "Warning: Failed to remove AlphaFold2 weights a
 # Download PyRosetta to /tmp
 echo -e "Downloading PyRosetta installation files to /tmp\n"
 mkdir -p /tmp/pyrosetta || { echo -e "Error: Failed to create temporary directory for PyRosetta"; exit 1; }
+conda index /tmp/pyrosetta
 $pkg_manager install -c /tmp/pyrosetta -c conda-forge -c nvidia --channel https://conda.graylab.jhu.edu pyrosetta -y || { echo -e "Error: Failed to download PyRosetta to /tmp"; exit 1; }
 
 
