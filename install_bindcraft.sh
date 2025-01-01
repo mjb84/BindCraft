@@ -48,6 +48,11 @@ SECONDS=0
 CONDA_BASE=$(conda info --base 2>/dev/null) || { echo -e "Error: conda is not installed or cannot be initialised."; exit 1; }
 echo -e "Conda is installed at: $CONDA_BASE"
 
+# Install libarchive dependency
+echo -e "Installing libarchive dependency\n"
+conda install -c conda-forge libarchive=3.6.2 -y || { echo -e "Error: Failed to install libarchive."; exit 1; }
+
+
 # Install required conda packages in the current environment
 echo -e "Installing BindCraft dependencies in the current environment\n"
 
