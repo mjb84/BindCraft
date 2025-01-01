@@ -110,7 +110,7 @@ python_packages=(
     py3dmol
     chex
     dm-haiku
-    flax<0.10.0
+    "flax<0.10.0"
     dm-tree
     joblib
     ml-collections
@@ -125,11 +125,11 @@ if [ -n "$cuda" ]; then
     echo "Installing JAX with CUDA support..."
     # Determine the correct jaxlib version based on CUDA
     # Example for CUDA 11.8
-    pip_packages+=("jaxlib==0.4.13+cuda118" "jax==0.4.13") # Replace with appropriate versions
+    python_packages+=("jaxlib==0.4.13+cuda118" "jax==0.4.13") # Replace with appropriate versions
     # Note: You might need to specify the exact URL for the CUDA-enabled jaxlib wheel
 else
     echo "Installing JAX without CUDA support..."
-    pip_packages+=("jaxlib" "jax")
+    python_packages+=("jaxlib" "jax")
 fi
 
 # Install all Python packages
@@ -161,10 +161,6 @@ pip3 install git+https://github.com/sokrypton/ColabDesign.git --no-deps || { ech
 
 # Verify ColabDesign installation
 python3 -c "import colabdesign" &>/dev/null || { echo "Error: colabdesign module not found after installation."; exit 1; }
-
-# Cleanup pip cache to save space
-echo "Cleaning up pip cache..."
-pip3 cache purge || { echo "Warning: Failed to purge pip cache."; }
 
 # Download AlphaFold2 model weights
 echo "Downloading AlphaFold2 model weights..."
