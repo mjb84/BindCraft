@@ -8,7 +8,7 @@ MICROMAMBA_DIR="/tmp/micromamba"
 ENV_DIR="/kaggle/working/bindcraft_env"
 
 # CUDA version (if needed)
-CUDA_VERSION=""  # e.g., "11.2" or leave empty for no CUDA support
+CUDA_VERSION="12.6"  # e.g., "11.2" or leave empty for no CUDA support
 
 ################## Step 1: Install Micromamba
 echo "Installing Micromamba..."
