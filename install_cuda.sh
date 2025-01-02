@@ -135,19 +135,38 @@ $MICROMAMBA_DIR/micromamba clean -a -y \
     || { echo "Warning: Failed to clean Micromamba cache."; }
 echo "Micromamba cache cleaned."
 
-
 ################## Step 5: Download and Extract AlphaFold2 Weights
 echo "Downloading AlphaFold2 model weights..."
 PARAMS_DIR="${ENV_DIR}/params"
-PARAMS_FILE="${PARAMS_DIR}/alphafold_params_2022-12-06.tar"
+TMP_DOWNLOAD_DIR="/tmp"
+TMP_PARAMS_FILE="${TMP_DOWNLOAD_DIR}/alphafold_params_2022-12-06.tar"
+FINAL_PARAMS_FILE="${PARAMS_DIR}/alphafold_params_2022-12-06.tar"
+
+# Create the parameters directory
 mkdir -p $PARAMS_DIR \
     || { echo "Error: Failed to create parameters directory."; exit 1; }
-wget -O $PARAMS_FILE "https://storage.googleapis.com/alphafold/alphafold_params_2022-12-06.tar" \
+
+# Download AF2 weights to /tmp
+echo "Downloading AF2 weights to $TMP_PARAMS_FILE..."
+wget -O $TMP_PARAMS_FILE "https://storage.googleapis.com/alphafold/alphafold_params_2022-12-06.tar" \
     || { echo "Error: Failed to download AlphaFold2 weights."; exit 1; }
-tar -xvf $PARAMS_FILE -C $PARAMS_DIR \
+
+# Verify the download
+if [ ! -s "$TMP_PARAMS_FILE" ]; then
+    echo "Error: Downloaded AlphaFold2 weights file is empty or does not exist."
+    exit 1
+fi
+
+# Extract AF2 weights to PARAMS_DIR
+echo "Extracting AF2 weights to $PARAMS_DIR..."
+tar -xvf $TMP_PARAMS_FILE -C $PARAMS_DIR \
     || { echo "Error: Failed to extract AlphaFold2 weights."; exit 1; }
-rm $PARAMS_FILE \
-    || { echo "Warning: Failed to remove AlphaFold2 weights archive."; }
+
+# Remove the downloaded tar file from /tmp
+echo "Removing downloaded AF2 weights tar file from /tmp..."
+rm $TMP_PARAMS_FILE \
+    || { echo "Warning: Failed to remove AlphaFold2 weights archive from /tmp."; }
+
 echo "AlphaFold2 weights downloaded and extracted to $PARAMS_DIR."
 
 ################## Step 6: Adjust Permissions for Executables
@@ -158,11 +177,7 @@ chmod +x "$(pwd)/functions/DAlphaBall.gcc" \
     || { echo "Error: Failed to chmod DAlphaBall.gcc."; exit 1; }
 echo "Permissions updated."
 
-################## Step 7: Clean Up Micromamba Cache
-echo "Cleaning up Micromamba cache..."
-$MICROMAMBA_DIR/micromamba clean -a -y \
-    || { echo "Warning: Failed to clean Micromamba cache."; }
-echo "Micromamba cache cleaned."
+
 
 ################## Finalization
 t=$SECONDS
