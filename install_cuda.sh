@@ -46,7 +46,7 @@ echo "Micromamba installed at $MICROMAMBA_DIR/micromamba"
 ################## Step 2: Create Conda Environment with Conditional CUDA Support
 echo "Creating Conda environment at $ENV_DIR..."
 
-# Define base packages
+# Define base packages (excluding jax and jaxlib)
 BASE_PACKAGES=(
     python=3.10
     pip
@@ -74,21 +74,17 @@ BASE_PACKAGES=(
     optax
 )
 
-# Define CUDA-specific packages
+# Define CUDA-specific packages (excluding jax and jaxlib)
 if [ -n "$CUDA_VERSION" ]; then
     echo "CUDA version specified: $CUDA_VERSION"
     CUDA_PACKAGES=(
-        "jaxlib=*=*cuda*$CUDA_VERSION*"
-        jax
         cuda-nvcc
         cudnn
+        # Add any other CUDA-specific packages here if needed
     )
 else
     echo "No CUDA version specified. Proceeding with CPU-only installation."
-    CUDA_PACKAGES=(
-        jaxlib
-        jax
-    )
+    CUDA_PACKAGES=()
 fi
 
 # Combine base and CUDA packages
@@ -103,7 +99,27 @@ $MICROMAMBA_DIR/micromamba create -y \
     "${ALL_PACKAGES[@]}" \
     || { echo "Error: Failed to create Conda environment."; exit 1; }
 
-################## Step 3: Install ColabDesign via pip
+################## Step 3: Install JAX and JAXLIB via pip
+echo "Installing JAX and JAXLIB via pip..."
+
+if [ -n "$CUDA_VERSION" ]; then
+    # Extract major CUDA version (e.g., 12 from 12.6)
+    CUDA_MAJOR_VERSION=$(echo $CUDA_VERSION | cut -d. -f1)
+    echo "Installing JAX with CUDA support (CUDA $CUDA_MAJOR_VERSION)..."
+    $MICROMAMBA_DIR/micromamba run -p $ENV_DIR pip install --upgrade "jax[cuda${CUDA_MAJOR_VERSION}]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html \
+        || { echo "Error: Failed to install JAX with CUDA support via pip."; exit 1; }
+else
+    echo "Installing JAX (CPU-only)..."
+    $MICROMAMBA_DIR/micromamba run -p $ENV_DIR pip install --upgrade jax jaxlib \
+        || { echo "Error: Failed to install JAX via pip."; exit 1; }
+fi
+
+# Verify JAX installation
+$MICROMAMBA_DIR/micromamba run -p $ENV_DIR python -c "import jax" \
+    || { echo "Error: jax module not found after installation."; exit 1; }
+echo "JAX successfully installed."
+
+################## Step 4: Install ColabDesign via pip
 echo "Installing ColabDesign..."
 $MICROMAMBA_DIR/micromamba run -p $ENV_DIR pip install git+https://github.com/sokrypton/ColabDesign.git --no-deps \
     || { echo "Error: Failed to install ColabDesign."; exit 1; }
@@ -112,12 +128,6 @@ $MICROMAMBA_DIR/micromamba run -p $ENV_DIR pip install git+https://github.com/so
 $MICROMAMBA_DIR/micromamba run -p $ENV_DIR python -c "import colabdesign" \
     || { echo "Error: colabdesign module not found after installation."; exit 1; }
 echo "ColabDesign successfully installed."
-
-################## Step 4: Clean Up Micromamba Cache
-echo "Cleaning up Micromamba cache..."
-$MICROMAMBA_DIR/micromamba clean -a -y \
-    || { echo "Warning: Failed to clean Micromamba cache."; }
-echo "Micromamba cache cleaned."
 
 ################## Step 5: Download and Extract AlphaFold2 Weights
 echo "Downloading AlphaFold2 model weights..."
