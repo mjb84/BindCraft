@@ -129,6 +129,13 @@ $MICROMAMBA_DIR/micromamba run -p $ENV_DIR python -c "import colabdesign" \
     || { echo "Error: colabdesign module not found after installation."; exit 1; }
 echo "ColabDesign successfully installed."
 
+################## Step 7: Clean Up Micromamba Cache
+echo "Cleaning up Micromamba cache..."
+$MICROMAMBA_DIR/micromamba clean -a -y \
+    || { echo "Warning: Failed to clean Micromamba cache."; }
+echo "Micromamba cache cleaned."
+
+
 ################## Step 5: Download and Extract AlphaFold2 Weights
 echo "Downloading AlphaFold2 model weights..."
 PARAMS_DIR="${ENV_DIR}/params"
