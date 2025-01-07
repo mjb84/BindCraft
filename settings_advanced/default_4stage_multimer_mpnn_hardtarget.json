@@ -61,7 +61,7 @@
     "enable_rejection_check": true,
     "acceptance_rate": 0.01,
     "start_monitoring": 300,
-    "af_params_dir": "",
-    "dssp_path": "",
-    "dalphaball_path": ""
+    "af_params_dir": "/kaggle/working/bindcraft_env/params",
+    "dssp_path": "/kaggle/working/BindCraft/functions/dssp",
+    "dalphaball_path": "/kaggle/working/BindCraft/functions/DAlphaBall.gcc"
 }
