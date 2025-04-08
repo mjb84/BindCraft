@@ -1,15 +1,15 @@
 #!/bin/bash
-################## BindCraft Installation Script for Kaggle (Adapted Version)
+################## BindCraft Installation Script for Kaggle (Modified Version with AlphaFold weights symlinked from /tmp)
+
 # This script installs BindCraft dependencies into a prefix-based Micromamba environment,
 # with conditional support for CUDA-enabled GPU acceleration.
+# It downloads AlphaFold2 weights to /tmp/alphafold and creates symlinks in /kaggle/working.
 
 ################## Configuration
 
-# Default CUDA version (set to empty for CPU-only installation)
 CUDA_VERSION=""
 
-# Parse command-line arguments for CUDA version
-# Usage: ./install_bindcraft.sh --cuda 12.6
+# Parse command-line arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --cuda)
@@ -24,163 +24,93 @@ while [[ "$#" -gt 0 ]]; do
     esac
 done
 
-# Define environment directories
 MICROMAMBA_DIR="/tmp/micromamba"
 ENV_DIR="/kaggle/working/bindcraft_env"
 
 ################## Step 1: Install Micromamba
 echo "Installing Micromamba..."
-wget -qO micromamba.tar.bz2 https://micro.mamba.pm/api/micromamba/linux-64/latest \
-    || { echo "Error: Failed to download Micromamba."; exit 1; }
-tar -xvjf micromamba.tar.bz2 bin/micromamba \
-    || { echo "Error: Failed to extract Micromamba."; exit 1; }
-chmod +x bin/micromamba \
-    || { echo "Error: Failed to make Micromamba executable."; exit 1; }
-mkdir -p $MICROMAMBA_DIR \
-    || { echo "Error: Failed to create Micromamba directory."; exit 1; }
-mv bin/micromamba $MICROMAMBA_DIR/micromamba \
-    || { echo "Error: Failed to move Micromamba."; exit 1; }
+wget -qO micromamba.tar.bz2 https://micro.mamba.pm/api/micromamba/linux-64/latest || exit 1
+tar -xvjf micromamba.tar.bz2 bin/micromamba || exit 1
+chmod +x bin/micromamba || exit 1
+mkdir -p $MICROMAMBA_DIR || exit 1
+mv bin/micromamba $MICROMAMBA_DIR/micromamba || exit 1
 rm -rf micromamba.tar.bz2 bin
 echo "Micromamba installed at $MICROMAMBA_DIR/micromamba"
 
-################## Step 2: Create Conda Environment with Conditional CUDA Support
+################## Step 2: Create Conda Environment
 echo "Creating Conda environment at $ENV_DIR..."
-
-# Define base packages (excluding jax and jaxlib)
 BASE_PACKAGES=(
-    python=3.10
-    pip
-    pandas
-    matplotlib
-    "numpy<2.0.0"
-    biopython
-    scipy
-    pdbfixer
-    seaborn
-    libgfortran5
-    tqdm
-    jupyter
-    ffmpeg
-    pyrosetta
-    fsspec
-    py3dmol
-    chex
-    dm-haiku
-    flax="0.9.0"
-    dm-tree
-    joblib
-    ml-collections
-    immutabledict
-    optax
+    python=3.10 pip pandas matplotlib "numpy<2.0.0" biopython scipy pdbfixer
+    seaborn libgfortran5 tqdm jupyter ffmpeg pyrosetta fsspec py3dmol chex
+    dm-haiku flax="0.9.0" dm-tree joblib ml-collections immutabledict optax
 )
 
-# Define CUDA-specific packages (excluding jax and jaxlib)
 if [ -n "$CUDA_VERSION" ]; then
     echo "CUDA version specified: $CUDA_VERSION"
-    CUDA_PACKAGES=(
-        cuda-nvcc
-        cudnn
-        # Add any other CUDA-specific packages here if needed
-    )
+    CUDA_PACKAGES=(cuda-nvcc cudnn)
 else
-    echo "No CUDA version specified. Proceeding with CPU-only installation."
+    echo "No CUDA version specified. CPU-only installation."
     CUDA_PACKAGES=()
 fi
 
-# Combine base and CUDA packages
 ALL_PACKAGES=("${BASE_PACKAGES[@]}" "${CUDA_PACKAGES[@]}")
 
-# Install packages using Micromamba
 $MICROMAMBA_DIR/micromamba create -y \
     -p $ENV_DIR \
-    -c conda-forge \
-    -c nvidia \
+    -c conda-forge -c nvidia \
     --channel https://conda.graylab.jhu.edu \
-    "${ALL_PACKAGES[@]}" \
-    || { echo "Error: Failed to create Conda environment."; exit 1; }
+    "${ALL_PACKAGES[@]}" || exit 1
 
-################## Step 3: Install JAX and JAXLIB via pip
-echo "Installing JAX and JAXLIB via pip..."
-
+################## Step 3: Install JAX via pip
+echo "Installing JAX..."
 if [ -n "$CUDA_VERSION" ]; then
-    # Extract major CUDA version (e.g., 12 from 12.6)
     CUDA_MAJOR_VERSION=$(echo $CUDA_VERSION | cut -d. -f1)
-    echo "Installing JAX with CUDA support (CUDA $CUDA_MAJOR_VERSION)..."
-    $MICROMAMBA_DIR/micromamba run -p $ENV_DIR pip install --upgrade "jax[cuda${CUDA_MAJOR_VERSION}]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html \
-        || { echo "Error: Failed to install JAX with CUDA support via pip."; exit 1; }
+    $MICROMAMBA_DIR/micromamba run -p $ENV_DIR pip install --upgrade "jax[cuda${CUDA_MAJOR_VERSION}]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html || exit 1
 else
-    echo "Installing JAX (CPU-only)..."
-    $MICROMAMBA_DIR/micromamba run -p $ENV_DIR pip install --upgrade jax jaxlib \
-        || { echo "Error: Failed to install JAX via pip."; exit 1; }
+    $MICROMAMBA_DIR/micromamba run -p $ENV_DIR pip install --upgrade jax jaxlib || exit 1
 fi
 
-# Verify JAX installation
-$MICROMAMBA_DIR/micromamba run -p $ENV_DIR python -c "import jax" \
-    || { echo "Error: jax module not found after installation."; exit 1; }
-echo "JAX successfully installed."
+$MICROMAMBA_DIR/micromamba run -p $ENV_DIR python -c "import jax" || exit 1
+echo "JAX installed."
 
-################## Step 4: Install ColabDesign via pip
+################## Step 4: Install ColabDesign
 echo "Installing ColabDesign..."
-$MICROMAMBA_DIR/micromamba run -p $ENV_DIR pip install git+https://github.com/sokrypton/ColabDesign.git --no-deps \
-    || { echo "Error: Failed to install ColabDesign."; exit 1; }
+$MICROMAMBA_DIR/micromamba run -p $ENV_DIR pip install git+https://github.com/sokrypton/ColabDesign.git --no-deps || exit 1
+$MICROMAMBA_DIR/micromamba run -p $ENV_DIR python -c "import colabdesign" || exit 1
+echo "ColabDesign installed."
 
-# Verify ColabDesign installation
-$MICROMAMBA_DIR/micromamba run -p $ENV_DIR python -c "import colabdesign" \
-    || { echo "Error: colabdesign module not found after installation."; exit 1; }
-echo "ColabDesign successfully installed."
+################## Step 5: Download AlphaFold2 Weights and Create Symlinks
+echo "Handling AlphaFold2 weights..."
+PARAMS_SYMLINK_DIR="${ENV_DIR}/params"
+WEIGHTS_STORAGE_DIR="/tmp/alphafold"
+TMP_PARAMS_TAR="/tmp/alphafold_params_2022-12-06.tar"
 
-################## Step 7: Clean Up Micromamba Cache
-echo "Cleaning up Micromamba cache..."
-$MICROMAMBA_DIR/micromamba clean -a -y \
-    || { echo "Warning: Failed to clean Micromamba cache."; }
-echo "Micromamba cache cleaned."
+mkdir -p "$WEIGHTS_STORAGE_DIR" "$PARAMS_SYMLINK_DIR" || exit 1
 
-################## Step 5: Download and Extract AlphaFold2 Weights
-echo "Downloading AlphaFold2 model weights..."
-PARAMS_DIR="${ENV_DIR}/params"
-TMP_DOWNLOAD_DIR="/tmp"
-TMP_PARAMS_FILE="${TMP_DOWNLOAD_DIR}/alphafold_params_2022-12-06.tar"
-FINAL_PARAMS_FILE="${PARAMS_DIR}/alphafold_params_2022-12-06.tar"
+echo "Downloading AlphaFold weights to $TMP_PARAMS_TAR..."
+wget -O "$TMP_PARAMS_TAR" "https://storage.googleapis.com/alphafold/alphafold_params_2022-12-06.tar" || exit 1
 
-# Create the parameters directory
-mkdir -p $PARAMS_DIR \
-    || { echo "Error: Failed to create parameters directory."; exit 1; }
+echo "Extracting AlphaFold weights to $WEIGHTS_STORAGE_DIR..."
+tar -xvf "$TMP_PARAMS_TAR" -C "$WEIGHTS_STORAGE_DIR" || exit 1
+rm "$TMP_PARAMS_TAR" || echo "Warning: Failed to delete tarball."
 
-# Download AF2 weights to /tmp
-echo "Downloading AF2 weights to $TMP_PARAMS_FILE..."
-wget -O $TMP_PARAMS_FILE "https://storage.googleapis.com/alphafold/alphafold_params_2022-12-06.tar" \
-    || { echo "Error: Failed to download AlphaFold2 weights."; exit 1; }
+echo "Creating symlinks in $PARAMS_SYMLINK_DIR..."
+for file in "$WEIGHTS_STORAGE_DIR"/*; do
+    ln -sf "$file" "$PARAMS_SYMLINK_DIR/"
+done
+echo "AlphaFold weights symlinked."
 
-# Verify the download
-if [ ! -s "$TMP_PARAMS_FILE" ]; then
-    echo "Error: Downloaded AlphaFold2 weights file is empty or does not exist."
-    exit 1
-fi
+################## Step 6: Adjust Permissions
+echo "Setting executable permissions..."
+chmod +x "$(pwd)/functions/dssp" 2>/dev/null || echo "dssp not found or already executable"
+chmod +x "$(pwd)/functions/DAlphaBall.gcc" 2>/dev/null || echo "DAlphaBall.gcc not found or already executable"
 
-# Extract AF2 weights to PARAMS_DIR
-echo "Extracting AF2 weights to $PARAMS_DIR..."
-tar -xvf $TMP_PARAMS_FILE -C $PARAMS_DIR \
-    || { echo "Error: Failed to extract AlphaFold2 weights."; exit 1; }
+################## Step 7: Clean Up
+echo "Cleaning Micromamba cache..."
+$MICROMAMBA_DIR/micromamba clean -a -y || echo "Warning: micromamba clean failed."
 
-# Remove the downloaded tar file from /tmp
-echo "Removing downloaded AF2 weights tar file from /tmp..."
-rm $TMP_PARAMS_FILE \
-    || { echo "Warning: Failed to remove AlphaFold2 weights archive from /tmp."; }
-
-echo "AlphaFold2 weights downloaded and extracted to $PARAMS_DIR."
-
-################## Step 6: Adjust Permissions for Executables
-echo "Changing permissions for executables..."
-chmod +x "$(pwd)/functions/dssp" \
-    || { echo "Error: Failed to chmod dssp."; exit 1; }
-chmod +x "$(pwd)/functions/DAlphaBall.gcc" \
-    || { echo "Error: Failed to chmod DAlphaBall.gcc."; exit 1; }
-echo "Permissions updated."
-
-
-
-################## Finalization
+################## Done
 t=$SECONDS
-echo "Successfully finished BindCraft installation!"
-echo "Installation took $(($t / 3600)) hours, $((($t / 60) % 60)) minutes and $(($t % 60)) seconds."
-echo "All dependencies are installed in $ENV_DIR and ready to use."
+echo "✔️ BindCraft installation complete!"
+echo "⏱️ Took $(($t / 3600))h $((($t / 60) % 60))m $(($t % 60))s"
+echo "📦 Environment installed in $ENV_DIR"
