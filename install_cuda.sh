@@ -25,7 +25,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 MICROMAMBA_DIR="/tmp/micromamba"
-ENV_DIR="/kaggle/working/bindcraft_env"
+ENV_DIR="/tmp/bindcraft_env"
 
 ################## Step 1: Install Micromamba
 echo "Installing Micromamba..."
