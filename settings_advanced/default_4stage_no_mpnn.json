@@ -63,7 +63,7 @@
     "start_monitoring": 600,
     "af_params_dir": "/kaggle/working/bindcraft_env/params",
     "dssp_path": "/kaggle/working/BindCraft/functions/dssp",
-    "dalphaball_path": "/kaggle/working/BindCraft/functions/DAlphaBall.gcc"
-    "stop_after_mpnn_generation": true
+    "dalphaball_path": "/kaggle/working/BindCraft/functions/DAlphaBall.gcc",
+    "stop_after_mpnn_generation": true,
     "save_mpnn_fasta": true
 }
