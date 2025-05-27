@@ -1,11 +1,6 @@
 #!/bin/bash
-################## BindCraft Installation Script for Kaggle (Conda‐installed JAX)
+################## BindCraft Installation Script for Kaggle (Conda-installed JAX)
 
-# Usage: ./install_cuda.sh [--cuda <version>]
-# If you pass --cuda, that version of cudatoolkit will be installed and
-# conda will pull in a matching GPU‐enabled jaxlib build.
-
-################## Configuration
 CUDA_VERSION=""
 while [[ "$#" -gt 0 ]]; do
   case $1 in
@@ -24,7 +19,6 @@ done
 MICROMAMBA_DIR="/tmp/micromamba"
 ENV_DIR="/tmp/bindcraft_env"
 
-################## Step 1: Install Micromamba
 echo "Installing Micromamba…"
 wget -qO micromamba.tar.bz2 https://micro.mamba.pm/api/micromamba/linux-64/latest || exit 1
 tar -xvjf micromamba.tar.bz2 bin/micromamba    || exit 1
@@ -34,23 +28,27 @@ mv bin/micromamba $MICROMAMBA_DIR/            || exit 1
 rm -rf micromamba.tar.bz2 bin
 echo "✔ Micromamba installed at $MICROMAMBA_DIR/micromamba"
 
-################## Step 2: Create Conda Environment (with pinned JAX)
-echo "Creating Conda environment at $ENV_DIR…"
-# Pick a JAX version that we know works together
-JAX_VER="0.4.14"
 
+echo "Creating Conda environment at $ENV_DIR…"
+JAX_VER="0.4.14"
 BASE_PACKAGES=(
   python=3.10 pip pandas matplotlib "numpy<2.0.0"
   biopython scipy pdbfixer seaborn libgfortran5 tqdm
   jupyter ffmpeg pyrosetta fsspec py3dmol chex dm-haiku
   flax="0.9.0" dm-tree joblib ml-collections immutabledict optax
-  # pin JAX & JAXLIB to same version
   jax=${JAX_VER} jaxlib=${JAX_VER}
 )
 
 if [ -n "$CUDA_VERSION" ]; then
   echo "→ CUDA requested: $CUDA_VERSION"
-  CUDA_PACKAGES=( cudatoolkit=${CUDA_VERSION} cuda-nvcc cudnn )
+  # conda-forge currently provides cudatoolkit up to 12.5
+  if [ "$CUDA_VERSION" = "12.6" ]; then
+    echo "⚠️  cudatoolkit 12.6 not available via conda-forge; falling back to 12.5"
+    CTK="12.5"
+  else
+    CTK="$CUDA_VERSION"
+  fi
+  CUDA_PACKAGES=( cudatoolkit=${CTK} cuda-nvcc cudnn )
 else
   echo "→ No CUDA: CPU‐only install"
   CUDA_PACKAGES=()
@@ -65,24 +63,19 @@ $MICROMAMBA_DIR/micromamba create -y \
   --channel https://conda.graylab.jhu.edu \
   "${ALL_PACKAGES[@]}" || { echo "ERROR: Conda env creation failed"; exit 1; }
 
-################## Step 3: Verify JAX
 echo "Verifying JAX import…"
 $MICROMAMBA_DIR/micromamba run -p $ENV_DIR python - << 'PYCODE' || exit 1
-import jax
-import jaxlib
-print("  JAX version:   ", jax.__version__)
-print("  JAXLIB version:", jaxlib.__version__)
+import jax, jaxlib
+print("  JAX:", jax.__version__, "JAXLIB:", jaxlib.__version__)
 PYCODE
 echo "✔ JAX is working"
 
-################## Step 4: Install ColabDesign
 echo "Installing ColabDesign…"
 $MICROMAMBA_DIR/micromamba run -p $ENV_DIR pip install \
   git+https://github.com/sokrypton/ColabDesign.git --no-deps || exit 1
-$MICROMAMBA_DIR/micromamba run -p $ENV_DIR python -c "import colabdesign" || { echo "ERROR: colabdesign failed"; exit 1; }
+$MICROMAMBA_DIR/micromamba run -p $ENV_DIR python -c "import colabdesign" || exit 1
 echo "✔ ColabDesign installed"
 
-################## Step 5: AlphaFold2 Weights (symlinked)
 echo "Handling AlphaFold2 weights…"
 PARAMS_SYMLINK_DIR="${ENV_DIR}/params"
 WEIGHTS_STORAGE_DIR="/tmp/alphafold"
@@ -97,16 +90,13 @@ for f in "$WEIGHTS_STORAGE_DIR"/*; do
 done
 echo "✔ AlphaFold weights symlinked"
 
-################## Step 6: Fix Permissions
 echo "Setting executables…"
-chmod +x "$(pwd)/functions/dssp" 2>/dev/null || echo "  (dssp missing/OK)"
+chmod +x "$(pwd)/functions/dssp"        2>/dev/null || echo "  (dssp missing/OK)"
 chmod +x "$(pwd)/functions/DAlphaBall.gcc" 2>/dev/null || echo "  (DAlphaBall.gcc missing/OK)"
 
-################## Step 7: Clean Up
 echo "Cleaning micromamba cache…"
 $MICROMAMBA_DIR/micromamba clean -a -y || echo "  (clean failed)"
 
-################## Done
 t=$SECONDS
 echo "✔️ Done! Took $(($t / 3600))h $((($t / 60) % 60))m $(($t % 60))s"
 echo "   Env location: $ENV_DIR"
