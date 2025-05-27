@@ -43,7 +43,7 @@ if [[ -z "$pkg_manager" ]]; then
 fi
 
 # If nothing exists (typical on Kaggle), bootstrap micromamba into working dir
-if [[ -z "$pkg_manager" || "$pkg_manager" == "micromamba" && ! $(command -v micromamba) ]]; then
+if [[ -z "$pkg_manager" || ( "$pkg_manager" == "micromamba" && ! command -v micromamba >/dev/null ) ]]; then
     echo "ℹ️  Boot-strapping standalone micromamba ..."
     INSTALL_ROOT=/kaggle/working/micromamba
     mkdir -p "$INSTALL_ROOT"
@@ -88,21 +88,25 @@ fi
 ############################## package install ################################
 echo "▶ Installing conda packages (${cuda:+GPU-enabled CUDA=$cuda})"
 
-# Channels
-BASE_CHAN="-c conda-forge --channel https://conda.graylab.jhu.edu"
-GPU_CHAN="-c nvidia"
+# Channels as arrays
+BASE_CHAN=( -c conda-forge --channel https://conda.graylab.jhu.edu )
+GPU_CHAN=( -c nvidia )
 
-# Base list (identical to original, but minus cuda packages if CPU mode)
-COMMON_PKGS="pip pandas matplotlib numpy<2.0.0 biopython scipy pdbfixer \
-             seaborn libgfortran5 tqdm jupyter ffmpeg pyrosetta \
-             fsspec py3dmol chex dm-haiku flax<0.10.0 dm-tree joblib \
-             ml-collections immutabledict optax"
+# Base list as array
+COMMON_PKGS=(
+  pip pandas matplotlib "numpy<2.0.0" biopython scipy pdbfixer
+  seaborn libgfortran5 tqdm jupyter ffmpeg pyrosetta
+  fsspec py3dmol chex dm-haiku "flax<0.10.0" dm-tree joblib
+  ml-collections immutabledict optax
+)
 
 if [[ -n "$cuda" ]]; then
-    GPU_PKGS="jaxlib=*=*cuda* jax cuda-nvcc cudnn"
-    "$pkg_manager" install -y $COMMON_PKGS $GPU_PKGS $BASE_CHAN $GPU_CHAN
+    GPU_PKGS=( jaxlib=*=*cuda* jax cuda-nvcc cudnn )
+    "$pkg_manager" install -y \
+      "${COMMON_PKGS[@]}" "${GPU_PKGS[@]}" "${BASE_CHAN[@]}" "${GPU_CHAN[@]}"
 else
-    "$pkg_manager" install -y $COMMON_PKGS jaxlib jax $BASE_CHAN
+    "$pkg_manager" install -y \
+      "${COMMON_PKGS[@]}" jaxlib jax "${BASE_CHAN[@]}"
 fi
 
 ############################## integrity check ################################
@@ -138,7 +142,7 @@ rm "$AF_ARCHIVE"
     { echo "❌  AlphaFold params missing"; exit 1; }
 
 ############################## executable perms ################################
-chmod +x "$(pwd)/functions/dssp"        || echo "⚠️  dssp chmod skipped"
+chmod +x "$(pwd)/functions/dssp"          || echo "⚠️  dssp chmod skipped"
 chmod +x "$(pwd)/functions/DAlphaBall.gcc" || echo "⚠️  DAlphaBall chmod skipped"
 
 ############################## clean-up #######################################
