@@ -1,22 +1,28 @@
 #!/usr/bin/env bash
 ##############################################################################
-# BindCraft – unified installer for Kaggle (old layout, new dependency handling)
-# Author: <your-name>                  Date: 2025-05-27
-# Tested on: Kaggle Python 3.10 CPU & GPU (CUDA 11.8) images – May 2025
+# BindCraft – Kaggle-compatible installer (prefix-based layout)
+# Author: <your-name>          Date: 2025-05-27
+# Usage: ./install_bindcraft.sh [--cuda <version>] [--cpu]
 ##############################################################################
 set -euo pipefail
 IFS=$'\n\t'
 
-######################### command-line options ################################
-CUDA_VERSION=''                     # --cuda <11.8> for GPU build
-CPU_ONLY=false                      # --cpu           for CPU-only
+########################## Parse command‐line flags ###########################
+CUDA_VERSION=""        # e.g. "--cuda 11.8"
+CPU_ONLY=false         # "--cpu" for CPU‐only build
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --cuda) CUDA_VERSION="$2"; shift 2 ;;
-    --cpu)  CPU_ONLY=true;      shift   ;;
+    --cuda)
+      CUDA_VERSION="$2"
+      shift 2
+      ;;
+    --cpu)
+      CPU_ONLY=true
+      shift
+      ;;
     *)
-      echo "Unknown option: $1" >&2
+      echo "Usage: $0 [--cuda <version>] [--cpu]" >&2
       exit 1
       ;;
   esac
@@ -27,12 +33,13 @@ if [[ "$CPU_ONLY" == true && -n "$CUDA_VERSION" ]]; then
   exit 1
 fi
 
-###################### micromamba bootstrap & setup ###########################
+########################## Directory configuration ###########################
 MICROMAMBA_DIR=/tmp/micromamba
 ENV_DIR=/tmp/bindcraft_env
 
-if [[ ! -x $MICROMAMBA_DIR/bin/micromamba ]]; then
-  echo "Installing micromamba to $MICROMAMBA_DIR..."
+####################### Bootstrap standalone micromamba #######################
+if ! command -v micromamba &> /dev/null; then
+  echo "📥 Bootstrapping micromamba into $MICROMAMBA_DIR"
   mkdir -p "$MICROMAMBA_DIR"
   curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest \
     | tar -xvj -C "$MICROMAMBA_DIR" bin/micromamba
@@ -42,51 +49,68 @@ fi
 MICROMAMBA_BIN="$MICROMAMBA_DIR/bin/micromamba"
 export PATH="$MICROMAMBA_DIR/bin:$PATH"
 
-########################### package specification #############################
+############################ Package specification ############################
+BASE_CHANNELS=(-c conda-forge --channel https://conda.graylab.jhu.edu)
+GPU_CHANNELS=(-c nvidia)
+
 COMMON_PKGS=(
   python=3.10
-  pip pandas matplotlib "numpy<2.0.0"
-  biopython scipy pdbfixer seaborn libgfortran5 tqdm
-  jupyter ffmpeg pyrosetta fsspec py3dmol chex
-  dm-haiku "flax<0.10.0" dm-tree joblib
-  ml-collections immutabledict optax
+  pip               # ensure pip is present
+  pandas matplotlib "numpy<2.0.0"
+  biopython scipy pdbfixer
+  seaborn libgfortran5 tqdm
+  jupyter ffmpeg pyrosetta
+  fsspec py3dmol chex
+  dm-haiku "flax<0.10.0" dm-tree
+  joblib ml-collections immutabledict optax
 )
 
 if [[ "$CPU_ONLY" == true || -z "$CUDA_VERSION" ]]; then
-  echo "Preparing CPU-only environment"
-  ALL_PKGS=( "${COMMON_PKGS[@]}" jaxlib jax )
-  CHANNELS=( -c conda-forge --channel https://conda.graylab.jhu.edu )
+  echo "⚙️  Preparing CPU‐only environment"
+  ALL_PKGS=("${COMMON_PKGS[@]}" jax jaxlib)
+  CHANNELS=("${BASE_CHANNELS[@]}")
 else
-  echo "Preparing GPU environment (CUDA ${CUDA_VERSION})"
-  GPU_PKGS=( "jaxlib=*=*cuda*" jax cuda-nvcc cudnn )
-  ALL_PKGS=( "${COMMON_PKGS[@]}" "${GPU_PKGS[@]}" )
-  CHANNELS=( -c conda-forge -c nvidia --channel https://conda.graylab.jhu.edu )
+  echo "⚙️  Preparing GPU environment (CUDA $CUDA_VERSION)"
+  # We’ll install JAX with CUDA support via pip later; for now include CUDA toolkits
+  ALL_PKGS=("${COMMON_PKGS[@]}" cuda-nvcc cudnn)
+  CHANNELS=("${BASE_CHANNELS[@]}" "${GPU_CHANNELS[@]}")
 fi
 
-############################# environment creation ############################
-echo "Solving environment; this may take several minutes..."
+############################ Create conda environment #########################
+echo "🚧 Creating Micromamba environment at $ENV_DIR"
 "$MICROMAMBA_BIN" create -y -p "$ENV_DIR" "${CHANNELS[@]}" "${ALL_PKGS[@]}"
 
-############################ integrity check ##################################
-echo "Verifying installation of core packages..."
+############################ Install JAX via pip ##############################
+echo "🚀 Installing JAX into the environment"
+if [[ -n "$CUDA_VERSION" ]]; then
+  # Determine major version for JAX CUDA wheel tag
+  CUDA_MAJOR=$(echo "$CUDA_VERSION" | cut -d. -f1)
+  "$MICROMAMBA_BIN" run -p "$ENV_DIR" pip install --upgrade \
+    "jax[cuda${CUDA_MAJOR}]" \
+    -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+else
+  "$MICROMAMBA_BIN" run -p "$ENV_DIR" pip install --upgrade jax jaxlib
+fi
+
+# verify JAX import
 "$MICROMAMBA_BIN" run -p "$ENV_DIR" python - <<'PYCODE'
-import importlib, sys
-core = ["numpy","scipy","jax","jaxlib","pandas","matplotlib"]
-missing = [pkg for pkg in core if importlib.util.find_spec(pkg) is None]
-if missing:
-    print("Missing packages:", missing, file=sys.stderr)
-    sys.exit(1)
+import importlib.util, sys
+for pkg in ("jax","jaxlib"):
+    if importlib.util.find_spec(pkg) is None:
+        print(f"Missing {pkg}", file=sys.stderr)
+        sys.exit(1)
 sys.exit(0)
 PYCODE
 
-############################ ColabDesign install ##############################
-echo "Installing ColabDesign (pip, no deps)..."
+########################## Install ColabDesign ################################
+echo "📦 Installing ColabDesign (no dependencies)"
 "$MICROMAMBA_BIN" run -p "$ENV_DIR" pip install --no-deps \
     git+https://github.com/sokrypton/ColabDesign.git
-"$MICROMAMBA_BIN" run -p "$ENV_DIR" python -c "import colabdesign"
+"$MICROMAMBA_BIN" run -p "$ENV_DIR" python -c "import colabdesign" \
+    || { echo "❌ ColabDesign import failed"; exit 1; }
 
-########################## AlphaFold weights setup ############################
-echo "Downloading and extracting AlphaFold2 parameters..."
+#################### Download & symlink AlphaFold2 weights ####################
+echo "📥 Downloading AlphaFold2 parameters"
 WEIGHTS_DIR=/tmp/alphafold
 SYMLINK_DIR="$ENV_DIR/params"
 ARCHIVE=/tmp/alphafold_params_2022-12-06.tar
@@ -97,27 +121,29 @@ wget -q --show-progress -O "$ARCHIVE" \
 tar -xf "$ARCHIVE" -C "$WEIGHTS_DIR"
 rm "$ARCHIVE"
 
-# Symlink each params file into the environment
-for file in "$WEIGHTS_DIR"/*; do
-  ln -sf "$file" "$SYMLINK_DIR"/
+echo "🔗 Creating symlinks in $SYMLINK_DIR"
+for f in "$WEIGHTS_DIR"/*; do
+  ln -sf "$f" "$SYMLINK_DIR"/
 done
 
-######################### executable permissions ##############################
+######################### Set executable permissions ##########################
 chmod +x "$(pwd)/functions/dssp"           2>/dev/null || true
 chmod +x "$(pwd)/functions/DAlphaBall.gcc"  2>/dev/null || true
 
-############################# clean-up ########################################
-echo "Cleaning package cache..."
+############################## Clean up cache #################################
+echo "🧹 Cleaning Micromamba cache"
 "$MICROMAMBA_BIN" clean -a -y
 
-############################## summary ########################################
-elapsed=$SECONDS
-printf "\nInstallation complete.\n"
-printf "Environment path: %s\n" "$ENV_DIR"
+############################### Done & summary ################################
+ELAPSED=$SECONDS
+printf "\n✅  Installation complete\n"
+printf "▶ Environment path: %s\n" "$ENV_DIR"
 if [[ -n "$CUDA_VERSION" ]]; then
-  printf "GPU support: CUDA %s\n" "$CUDA_VERSION"
+  printf "▶ GPU support: CUDA %s\n" "$CUDA_VERSION"
 else
-  printf "GPU support: none (CPU-only)\n"
+  printf "▶ GPU support: none (CPU-only)\n"
 fi
-printf "Elapsed time: %d h %d m %d s\n" \
-       "$((elapsed/3600))" "$(((elapsed/60)%60))" "$((elapsed%60))"
+printf "▶ To run commands inside the env:\n"
+printf "   %s run -p %s <command>\n" "$MICROMAMBA_BIN" "$ENV_DIR"
+printf "⌛ Elapsed time: %d h %d m %d s\n" \
+       "$((ELAPSED/3600))" "$(((ELAPSED/60)%60))" "$((ELAPSED%60))"
