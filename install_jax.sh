@@ -43,7 +43,7 @@ if [[ -z "$pkg_manager" ]]; then
 fi
 
 # If nothing exists (typical on Kaggle), bootstrap micromamba into working dir
-if [[ -z "$pkg_manager" || ( "$pkg_manager" == "micromamba" && ! command -v micromamba >/dev/null ) ]]; then
+if [[ -z "$pkg_manager" ]] || { [[ "$pkg_manager" == "micromamba" ]] && ! command -v micromamba >/dev/null; }; then
     echo "ℹ️  Boot-strapping standalone micromamba ..."
     INSTALL_ROOT=/kaggle/working/micromamba
     mkdir -p "$INSTALL_ROOT"
