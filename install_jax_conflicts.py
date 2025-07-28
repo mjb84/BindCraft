@@ -51,7 +51,7 @@ echo "✔ micromamba installed."
 echo "==> Creating conda environment at $ENV_DIR..."
 "$MICROMAMBA_DIR/micromamba" create -y -p "$ENV_DIR" -c conda-forge -c nvidia \
     python=3.10 pip pandas matplotlib "numpy<2.0.0" biopython scipy pdbfixer tqdm \
-    jupyter ffmpeg fsspec py3dmol \
+    jupyter ffmpeg fsspec py3dmol dm-haiku \
   || { echo "Conda env creation failed"; exit 1; }
 echo "✔ Environment created."
 
