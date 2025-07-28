@@ -41,7 +41,7 @@ echo "Micromamba installed at $MICROMAMBA_DIR/micromamba"
 echo "Creating Conda environment at $ENV_DIR..."
 BASE_PACKAGES=(
     python=3.10 pip pandas matplotlib "numpy<2.0.0" biopython scipy pdbfixer
-    seaborn libgfortran5 tqdm jupyter ffmpeg pyrosetta fsspec py3dmol chex
+    seaborn libgfortran5 tqdm jupyter ffmpeg fsspec py3dmol chex
     dm-haiku flax="0.9.0" dm-tree joblib ml-collections immutabledict optax
 )
 
